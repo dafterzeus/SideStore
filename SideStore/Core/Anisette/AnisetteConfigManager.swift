@@ -110,6 +110,20 @@ public actor AnisetteConfigManager {
         }
     }
     
+    public func migrateToWindowsAnisetteIfNeeded() async {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "memfix4WindowsAnisetteMigrated") else { return }
+        // Android ODA and the old Mac servers cannot supply Windows ADI data.
+        await AnisetteServersManager.shared.migrateToWindowsServers()
+        defaults.useOnDeviceAnisette = false
+        defaults.menuAnisetteURL = AppConstants.Anisette.Servers.defaultServerURL
+        defaults.customAnisetteClientInfo = nil
+        defaults.customAnisetteUserAgent = nil
+        anisetteAdiBlob = nil
+        SideSign.AnisetteDataManager.shared.clearCache()
+        defaults.set(true, forKey: "memfix4WindowsAnisetteMigrated")
+    }
+
     public func loadConfig() -> AnisetteConfig {
         let ud = UserDefaults.standard
         let udClientInfo   = ud.customAnisetteClientInfo
@@ -130,8 +144,12 @@ public actor AnisetteConfigManager {
             return config
         }()
 
-        let resolvedClientInfo   = (udClientInfo?.isEmpty == false ? udClientInfo : fileConfig?.clientInfo) ?? AppConstants.Anisette.defaultClientInfo
-        let resolvedUserAgent    = (udUserAgent?.isEmpty == false ? udUserAgent : fileConfig?.userAgent) ?? AppConstants.Anisette.defaultUserAgent
+        let savedClientInfo = (udClientInfo?.isEmpty == false ? udClientInfo : fileConfig?.clientInfo) ?? ""
+        let savedUserAgent = (udUserAgent?.isEmpty == false ? udUserAgent : fileConfig?.userAgent) ?? ""
+        let legacyIdentity = ["Pixel", "Android", "Mac", "macOS", "dt.Xcode"].contains { savedClientInfo.contains($0) }
+        let legacyAgent = ["Macintosh", "OS X", "dt.Xcode"].contains { savedUserAgent.contains($0) }
+        let resolvedClientInfo = savedClientInfo.isEmpty || legacyIdentity ? AppConstants.Anisette.defaultClientInfo : savedClientInfo
+        let resolvedUserAgent = savedUserAgent.isEmpty || legacyIdentity || legacyAgent ? AppConstants.Anisette.defaultUserAgent : savedUserAgent
         let resolvedDeviceID     = (udDeviceID?.isEmpty == false ? udDeviceID : fileConfig?.customDeviceID)
         let resolvedLocalUserID  = (udLocalUserID?.isEmpty == false ? udLocalUserID : fileConfig?.customLocalUserID)
         let resolvedLocale       = (udLocale?.isEmpty == false ? udLocale : fileConfig?.customLocale)

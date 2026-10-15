@@ -18,10 +18,12 @@ jobs:
         with:
           xcode-version: "26.2"
 
-      - name: Set version
-        run: |
-          MARKETING_VERSION=$(python3 scripts/ci/workflow.py get-marketing-version)
-          python3 scripts/ci/workflow.py set-marketing-version "${MARKETING_VERSION}-memfix+$(git rev-parse --short HEAD)"
+      - name: Preserve memfix-3 bundle version
+        run: python3 scripts/ci/workflow.py set-marketing-version "0.7.0-memfix+b06ddd9"
+
+      - name: Test authentication and Memory+ without signing in
+        working-directory: Dependencies/SideSign
+        run: swift test --filter 'AnisetteAuthTests|CapabilityTests'
 
       - name: Build
         run: |

@@ -11,6 +11,7 @@ import SideSign
 
 enum AnisetteProvider {
     static func fetch(handler: AnisetteServerHandler? = nil) async throws -> ALTAnisetteData {
+        await AnisetteConfigManager.shared.migrateToWindowsAnisetteIfNeeded()
         if UserDefaults.standard.useOnDeviceAnisette {
             debugLog("[AnisetteProvider] Fetching anisette via On-Device Anisette (ODA)...")
             return try await OnDeviceAnisetteManager.shared.fetchAnisetteData()
@@ -42,6 +43,11 @@ enum AnisetteProvider {
             existingAdiBlob: existingBlob,
             headers: headers,
             onError: { error in
+                if let anisetteError = error as? SideSign.AnisetteError,
+                   case .incorrectlyProvisioned = anisetteError {
+                    AnisetteConfigManager.shared.anisetteAdiBlob = nil
+                    return true
+                }
                 if let anisetteError = error as? SideSign.AnisetteError,
                    case .outdatedV1Server(let serverURL, _) = anisetteError {
                     if UserDefaults.standard.defaultServerURL == serverURL.absoluteString {

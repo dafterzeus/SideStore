@@ -256,6 +256,10 @@ final class SignInOperation: BaseStandaloneOperation<StandaloneOperationContext,
                 return (account, session)
             } catch {
                 self.debugLog("[SignInOperation] authenticationLoop: Attempt failed with error: \(error)")
+                if "\(error)".contains("-80045") || "\(error)".contains("-45061") {
+                    AnisetteConfigManager.shared.anisetteAdiBlob = nil
+                    SideSign.AnisetteDataManager.shared.clearCache()
+                }
                 await handler.handleSignInResult(.failure(error))
             }
         }

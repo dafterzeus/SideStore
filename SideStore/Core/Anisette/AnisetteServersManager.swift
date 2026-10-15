@@ -72,7 +72,9 @@ public actor AnisetteServersManager {
 
         guard fileManager.fileExists(atPath: targetURL.path),
               let data = try? Data(contentsOf: targetURL) else {
-            return []
+            let items = Self.windowsDefaults
+            saveLocalServers(items)
+            return items
         }
 
         let decoder = Foundation.JSONDecoder()
@@ -89,11 +91,28 @@ public actor AnisetteServersManager {
             }
         }
 
-        inMemoryServersCache = items
-        return items
+        let migrated = Self.windowsFirst(items)
+        if migrated != items { saveLocalServers(migrated) }
+        inMemoryServersCache = migrated
+        return migrated
+    }
+
+    private static let windowsDefaults = [
+        AnisetteServerItem(name: "Jkcoxson (Windows)", address: AppConstants.Anisette.Servers.windowsServerURLs[0]),
+        AnisetteServerItem(name: "StikStore (Windows)", address: AppConstants.Anisette.Servers.windowsServerURLs[1]),
+        AnisetteServerItem(name: "SideStore (Windows)", address: AppConstants.Anisette.Servers.windowsServerURLs[2])
+    ]
+
+    private static func windowsFirst(_ items: [AnisetteServerItem]) -> [AnisetteServerItem] {
+        let defaults = windowsDefaults.map { item in
+            items.first(where: { $0.address == item.address }) ?? item
+        }
+        let addresses = Set(defaults.map(\.address))
+        return defaults + items.filter { !addresses.contains($0.address) }
     }
 
     public func saveLocalServers(_ items: [AnisetteServerItem]) {
+        let items = Self.windowsFirst(items)
         inMemoryServersCache = items
 
         let encoder = Foundation.JSONEncoder()
@@ -110,6 +129,17 @@ public actor AnisetteServersManager {
         if !active.contains(currentURL), let first = active.first {
             UserDefaults.standard.menuAnisetteURL = first
         }
+    }
+
+    public func migrateToWindowsServers() {
+        let oldItems = loadLocalServers().filter {
+            !AppConstants.Anisette.Servers.windowsServerURLs.contains($0.address)
+        }.map { item in
+            var item = item
+            item.isHidden = true
+            return item
+        }
+        saveLocalServers(Self.windowsDefaults + oldItems)
     }
 
     public func getActiveServerURLs() -> [String] {
@@ -363,13 +393,18 @@ public actor AnisetteServersManager {
             }
         }
 
+        for local in localItems where AppConstants.Anisette.Servers.windowsServerURLs.contains(local.address) {
+            if !mergedItems.contains(where: { $0.address == local.address }) { mergedItems.append(local) }
+        }
+
         // 2. Append newly added remote servers
         for newRemote in remainingRemote {
             mergedItems.append(AnisetteServerItem(name: newRemote.name, address: newRemote.address, isHidden: false))
         }
 
-        saveLocalServers(mergedItems)
-        return mergedItems
+        let ordered = Self.windowsFirst(mergedItems)
+        saveLocalServers(ordered)
+        return ordered
     }
 
     // MARK: - Triggered Syncs
