@@ -116,6 +116,7 @@ public actor AnisetteConfigManager {
         // Android ODA and the old Mac servers cannot supply Windows ADI data.
         await AnisetteServersManager.shared.migrateToWindowsServers()
         defaults.useOnDeviceAnisette = false
+        defaults.disableAnisetteRotation = false
         defaults.menuAnisetteURL = AppConstants.Anisette.Servers.defaultServerURL
         defaults.customAnisetteClientInfo = nil
         defaults.customAnisetteUserAgent = nil
